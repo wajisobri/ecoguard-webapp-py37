@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Home</title>
+
+		<link
+			rel="icon"
+			href="{{ url_for('static', filename='images/logo.png') }}"
+		/>
+
+		<!-- Bootstrap core CSS -->
+		<link
+			href="{{ url_for('static', filename='css/bootstrap.min.css') }}"
+			rel="stylesheet"
+		/>
+		<link
+			href="{{ url_for('static', filename='css/style.css') }}"
+			rel="stylesheet"
+		/>
+	</head>
+	<body>
+		<div class="main-container col-12 px-4 py-5">
+			<div class="row g-5 py-5">
+				<div class="col-12 col-md-6">
+					<h4 class="sub-title fw-bold text-light">PKM-KC 2023</h4>
+
+					<h1 class="title display-4 fw-bold lh-1 mb-4 text-light">
+						EcoGuard ChargeBox
+					</h1>
+					<p class="description text-light">
+						EcoGuard is an IoT-based Smart Locker System powered by solar
+						panels. It ensures security through multi-factor authentication,
+						utilizing advanced iris biometric recognition for unlocking lockers
+						and pins.
+					</p>
+
+					<a
+						href="{{ url_for('menu') }}"
+						class="redirect btn btn-light btn-lg px-4 py-1"
+					>
+						USE NOW
+					</a>
+				</div>
+				<div class="col-12 col-md-6 px-3">
+					<div class="illustration">
+						<div class="logo">
+							<img
+								class=""
+								src="{{ url_for('static', filename='images/logo.png') }}"
+								alt=""
+							/>
+						</div>
+
+						<div class="iris">
+							<img
+								class=""
+								src="{{ url_for('static', filename='images/iris.svg') }}"
+								alt=""
+							/>
+						</div>
+
+						<div class="solar">
+							<img
+								class=""
+								src="{{ url_for('static', filename='images/solar.svg') }}"
+								alt=""
+							/>
+						</div>
+
+						<div class="locker">
+							<img
+								class=""
+								src="{{ url_for('static', filename='images/locker.svg') }}"
+								alt=""
+							/>
+						</div>
+
+						<div class="charger">
+							<img
+								class=""
+								src="{{ url_for('static', filename='images/charger.svg') }}"
+								alt=""
+							/>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+	</body>
+</html>

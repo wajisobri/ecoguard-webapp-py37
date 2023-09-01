@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Pin Auth - Locker {{ locker_detail.code }}</title>
+
+		<link
+			rel="icon"
+			href="{{ url_for('static', filename='images/logo.png') }}"
+		/>
+
+		<!-- Bootstrap core CSS -->
+		<link
+			href="{{ url_for('static', filename='css/bootstrap.min.css') }}"
+			rel="stylesheet"
+		/>
+		<link
+			href="{{ url_for('static', filename='css/style.css') }}"
+			rel="stylesheet"
+		/>
+	</head>
+	<body>
+		<div class="light-container col-12 p-0">
+			<div class="header h-auto py-2">
+				<div class="brand d-flex flex-row justify-content-between px-3">
+					<div class="d-flex flex-row justify-content-center">
+						<img
+							class=""
+							src="{{ url_for('static', filename='images/logo.png') }}"
+							alt=""
+						/>
+						<h4 class="fw-bold d-flex align-items-center">
+							EcoGuard Charge Box
+						</h4>
+					</div>
+					<div class="d-flex flex-row align-items-center me-2">
+						<a
+							href="{{ url_for('back', to='menu') }}"
+							class="back btn btn-warning fw-bold px-4 d-flex flex-row align-items-center"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="16"
+								height="16"
+								fill="currentColor"
+								class="bi bi-arrow-left-circle-fill"
+								viewBox="0 0 16 16"
+							>
+								<path
+									d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm3.5 7.5a.5.5 0 0 1 0 1H5.707l2.147 2.146a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L5.707 7.5H11.5z"
+								/>
+							</svg>
+							<span>&nbsp;Back</span>
+						</a>
+					</div>
+				</div>
+			</div>
+
+			<div class="wrapper px-4 py-4">
+				<div class="row">
+					<div class="col-6">
+						<div
+							id="pin_single"
+							class="d-flex font-h2-strong justify-content-between"
+						>
+							<input
+								class="font-h2-strong"
+								placeholder="_"
+								type="number"
+								step="1"
+								min="0"
+								max="9"
+								autocomplete="no"
+								pattern="\d*"
+							/>
+							<input
+								class="font-h2-strong"
+								placeholder="_"
+								type="number"
+								step="1"
+								min="0"
+								max="9"
+								autocomplete="no"
+								pattern="\d*"
+							/>
+							<input
+								class="font-h2-strong"
+								placeholder="_"
+								type="number"
+								step="1"
+								min="0"
+								max="9"
+								autocomplete="no"
+								pattern="\d*"
+							/>
+							<input
+								class="font-h2-strong"
+								placeholder="_"
+								type="number"
+								step="1"
+								min="0"
+								max="9"
+								autocomplete="no"
+								pattern="\d*"
+							/>
+							<input
+								class="font-h2-strong"
+								placeholder="_"
+								type="number"
+								step="1"
+								min="0"
+								max="9"
+								autocomplete="no"
+								pattern="\d*"
+							/>
+							<input
+								class="font-h2-strong"
+								placeholder="_"
+								type="number"
+								step="1"
+								min="0"
+								max="9"
+								autocomplete="no"
+								pattern="\d*"
+							/>
+						</div>
+
+						<form
+							id="auth_pin_form"
+							action="{{ url_for('auth_pin_validate', locker_code=locker_detail.code) }}"
+							method="POST"
+						>
+							<input
+								id="pin_full"
+								placeholder="_"
+								type="hidden"
+								name="pin_full"
+							/>
+						</form>
+
+						<div class="d-flex gap-2 mt-2">
+							<button class="btn btn-secondary btn-lg fw-bold w-50" id="reset">
+								Reset
+							</button>
+							<button class="btn btn-primary btn-lg fw-bold w-50" id="submit">
+								Submit
+							</button>
+						</div>
+
+						<div class="item-info p-3 mt-3">
+							<h5 class="fw-bold">Locker</h5>
+							<h4 class="fw-bold">{{ locker_detail.code }}</h4>
+							<div class="status d-flex flex-row justify-content-between">
+								<div class="status-text fw-bold">Status</div>
+								<div class="status-button">
+									{% if locker_detail.status == "Available" or
+									locker_detail.status == "Ready": %}
+									<button
+										class="btn btn-primary btn-lg no-hover fw-bold px-4 py-1"
+									>
+										{{ locker_detail.status.capitalize() }}
+									</button>
+									{% else %}
+									<button
+										class="btn btn-danger btn-lg no-hover fw-bold px-4 py-1"
+									>
+										{{ locker_detail.status.capitalize() }}
+									</button>
+									{% endif %}
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="col-6">
+						<div class="pin">
+							<div class="num-row d-flex flex-column text-center gap-3">
+								<div
+									class="num-col d-flex flex-row justify-content-between gap-3"
+								>
+									<button class="num-item p-2 w-100 fw-bold">1</button>
+									<button class="num-item p-2 w-100 fw-bold">2</button>
+									<button class="num-item p-2 w-100 fw-bold">3</button>
+								</div>
+
+								<div
+									class="num-col d-flex flex-row justify-content-between gap-3"
+								>
+									<button class="num-item p-2 w-100 fw-bold">4</button>
+									<button class="num-item p-2 w-100 fw-bold">5</button>
+									<button class="num-item p-2 w-100 fw-bold">6</button>
+								</div>
+
+								<div
+									class="num-col d-flex flex-row justify-content-between gap-3"
+								>
+									<button class="num-item p-2 w-100 fw-bold">7</button>
+									<button class="num-item p-2 w-100 fw-bold">8</button>
+									<button class="num-item p-2 w-100 fw-bold">9</button>
+								</div>
+
+								<div
+									class="num-col d-flex flex-row justify-content-between gap-3"
+								>
+									<button class="num-item-ignore p-2 w-100 fw-bold"></button>
+									<button class="num-item p-2 w-100 fw-bold">0</button>
+									<button class="num-item-delete p-2 w-100 fw-bold">X</button>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+		<script src="{{ url_for('static', filename='js/pin-input.js') }}"></script>
+	</body>
+</html>

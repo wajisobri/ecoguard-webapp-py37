@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Waiting - Locker {{ locker_detail.code }}</title>
+
+		<link
+			rel="icon"
+			href="{{ url_for('static', filename='images/logo.png') }}"
+		/>
+
+		<!-- Bootstrap core CSS -->
+		<link
+			href="{{ url_for('static', filename='css/bootstrap.min.css') }}"
+			rel="stylesheet"
+		/>
+		<link
+			href="{{ url_for('static', filename='css/style.css') }}"
+			rel="stylesheet"
+		/>
+	</head>
+	<body>
+		<div class="light-container col-12 p-0">
+			<div class="header h-auto py-2">
+				<div class="brand d-flex flex-row justify-content-between px-3">
+					<div class="d-flex flex-row justify-content-center">
+						<img
+							class=""
+							src="{{ url_for('static', filename='images/logo.png') }}"
+							alt=""
+						/>
+						<h4 class="fw-bold d-flex align-items-center">
+							EcoGuard Charge Box
+						</h4>
+					</div>
+					<div class="d-flex flex-row align-items-center me-2">
+						<a
+							href="{{ url_for('back', to='menu') }}"
+							class="back btn btn-warning fw-bold px-4 d-flex flex-row align-items-center"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="16"
+								height="16"
+								fill="currentColor"
+								class="bi bi-arrow-left-circle-fill"
+								viewBox="0 0 16 16"
+							>
+								<path
+									d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm3.5 7.5a.5.5 0 0 1 0 1H5.707l2.147 2.146a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L5.707 7.5H11.5z"
+								/>
+							</svg>
+							<span>&nbsp;Back</span>
+						</a>
+					</div>
+				</div>
+			</div>
+
+			<div
+				class="wrapper px-4 py-4 d-flex flex-column align-items-center justify-content-center gap-4"
+			>
+				<div class="waiting-icon mt-2">
+					<svg
+						width="87"
+						height="122"
+						viewBox="0 0 87 122"
+						fill="none"
+						xmlns="http://www.w3.org/2000/svg"
+					>
+						<path
+							d="M64.0933 32.8825C63.5381 21.7156 54.3732 12.7781 43.1145 12.5886C31.1637 12.3892 21.3836 22.5668 21.3836 34.5201V52.6432H8.79803V34.6766C8.79803 16.2012 23.256 0.564329 41.724 0.0152164C60.5002 -0.541234 76.0258 14.2347 76.6801 32.7321C76.6839 32.8917 76.6556 33.0505 76.5969 33.1991C76.5383 33.3476 76.4504 33.4829 76.3386 33.5969C76.2267 33.711 76.0931 33.8014 75.9457 33.8629C75.7983 33.9244 75.6401 33.9557 75.4804 33.955H65.1903C64.9043 33.9526 64.6304 33.8396 64.4258 33.6397C64.2213 33.4397 64.1022 33.1684 64.0933 32.8825Z"
+							fill="url(#paint0_linear_41_130)"
+						/>
+						<path
+							d="M43.0925 6.1814C27.8971 6.1814 15.5317 18.7193 15.5317 34.1299V49.5136H21.3799V34.52C21.3799 22.5667 31.1637 12.3843 43.1109 12.5885C54.3414 12.7769 63.4892 21.6703 64.0848 32.7981C64.0958 33.1065 64.2252 33.3988 64.4461 33.6142C64.667 33.8297 64.9625 33.9517 65.2711 33.955H70.6215C70.6252 18.5456 58.2867 6.1814 43.0925 6.1814Z"
+							fill="url(#paint1_linear_41_130)"
+						/>
+						<path
+							d="M80.3649 44.2231H5.90082C4.33745 44.2231 2.8381 44.8442 1.73263 45.9497C0.62716 47.0551 0.00611305 48.5545 0.00611305 50.1179V115.399C0.00611305 116.962 0.62716 118.461 1.73263 119.567C2.8381 120.672 4.33745 121.293 5.90082 121.293H80.3649C81.1391 121.294 81.9058 121.141 82.6211 120.845C83.3364 120.549 83.9864 120.115 84.5339 119.567C85.0814 119.02 85.5157 118.37 85.812 117.655C86.1084 116.94 86.2609 116.173 86.2609 115.399V50.1179C86.2609 49.3436 86.1084 48.577 85.812 47.8618C85.5157 47.1465 85.0814 46.4966 84.5339 45.9492C83.9864 45.4018 83.3364 44.9677 82.6211 44.6715C81.9058 44.3753 81.1391 44.223 80.3649 44.2231ZM47.7043 83.7104V93.9662C47.7043 95.1786 47.2227 96.3414 46.3654 97.1987C45.5081 98.056 44.3453 98.5376 43.1329 98.5376C41.9205 98.5376 40.7577 98.056 39.9004 97.1987C39.0431 96.3414 38.5614 95.1786 38.5614 93.9662V83.7104C36.8624 82.7077 35.5402 81.1744 34.7983 79.3465C34.0564 77.5185 33.936 75.4974 34.4556 73.5943C34.9753 71.6912 36.1062 70.0117 37.6741 68.8145C39.2421 67.6173 41.1601 66.9688 43.1329 66.9688C45.1056 66.9688 47.0237 67.6173 48.5916 68.8145C50.1596 70.0117 51.2905 71.6912 51.8101 73.5943C52.3298 75.4974 52.2094 77.5185 51.4675 79.3465C50.7256 81.1744 49.4033 82.7077 47.7043 83.7104Z"
+							fill="url(#paint2_linear_41_130)"
+						/>
+						<path
+							d="M86.2609 115.399V50.1177C86.2605 48.5541 85.6393 47.0547 84.5336 45.949C83.428 44.8434 81.9285 44.2221 80.3649 44.2218H79.7241C81.4424 58.9512 83.7024 106.434 44.1736 121.293H80.3649C81.9284 121.293 83.4279 120.672 84.5335 119.567C85.6392 118.461 86.2605 116.962 86.2609 115.399Z"
+							fill="url(#paint3_linear_41_130)"
+						/>
+						<path
+							d="M0 50.1177V115.399C0.000324308 116.962 0.621644 118.461 1.72731 119.567C2.83298 120.672 4.33245 121.293 5.89593 121.293H6.4108C1.04564 60.7943 31.1148 44.2218 31.1148 44.2218H5.90082C5.12619 44.2213 4.35906 44.3735 3.64324 44.6695C2.92742 44.9656 2.27694 45.3998 1.72897 45.9473C1.18099 46.4948 0.746257 47.1449 0.449596 47.8605C0.152935 48.5761 0.000160495 49.3431 0 50.1177Z"
+							fill="url(#paint4_linear_41_130)"
+						/>
+						<defs>
+							<linearGradient
+								id="paint0_linear_41_130"
+								x1="17.0005"
+								y1="56.6387"
+								x2="61.8113"
+								y2="5.61642"
+								gradientUnits="userSpaceOnUse"
+							>
+								<stop offset="0.05" stop-color="#8BC43F" />
+								<stop offset="0.86" stop-color="#B0EA4B" />
+							</linearGradient>
+							<linearGradient
+								id="paint1_linear_41_130"
+								x1="40.4142"
+								y1="27.8475"
+								x2="148.549"
+								y2="27.8475"
+								gradientUnits="userSpaceOnUse"
+							>
+								<stop offset="0.05" stop-color="#8BC43F" />
+								<stop offset="0.86" stop-color="#B0EA4B" />
+							</linearGradient>
+							<linearGradient
+								id="paint2_linear_41_130"
+								x1="-24.1683"
+								y1="110.207"
+								x2="90.9852"
+								y2="63.2415"
+								gradientUnits="userSpaceOnUse"
+							>
+								<stop offset="0.05" stop-color="#8BC43F" />
+								<stop offset="0.86" stop-color="#B0EA4B" />
+							</linearGradient>
+							<linearGradient
+								id="paint3_linear_41_130"
+								x1="34.8876"
+								y1="82.7575"
+								x2="95.5689"
+								y2="82.7575"
+								gradientUnits="userSpaceOnUse"
+							>
+								<stop offset="0.05" stop-color="#8BC43F" />
+								<stop offset="0.86" stop-color="#B0EA4B" />
+							</linearGradient>
+							<linearGradient
+								id="paint4_linear_41_130"
+								x1="-23.6791"
+								y1="89.2063"
+								x2="62.9058"
+								y2="70.2906"
+								gradientUnits="userSpaceOnUse"
+							>
+								<stop offset="0.05" stop-color="#8BC43F" />
+								<stop offset="0.86" stop-color="#B0EA4B" />
+							</linearGradient>
+						</defs>
+					</svg>
+				</div>
+
+				<div class="waiting-message">
+					<h4 class="fw-bold text-center w-75 mx-auto">
+						Locker is now unlocked, please keep your device as soon as possible
+					</h4>
+				</div>
+
+				<div class="waiting-action">
+					<div class="d-flex gap-2">
+						<button class="btn btn-danger btn-lg fw-bold px-5">Cancel</button>
+						<button class="btn btn-primary btn-lg fw-bold px-5">Done</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+	</body>
+</html>
