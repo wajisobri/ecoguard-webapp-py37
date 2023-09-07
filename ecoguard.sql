@@ -27,6 +27,7 @@ CREATE TABLE `auth_logs` (
   `user_id` int NOT NULL,
   `locker_id` int NOT NULL,
   `action` enum('KEEP','PICKUP') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `auth_type` enum('PIN','IRIS') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `status` enum('VALID','INVALID') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -54,8 +55,10 @@ DROP TABLE IF EXISTS `lockers`;
 CREATE TABLE `lockers` (
   `id` int NOT NULL AUTO_INCREMENT,
   `code` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
-  `status` enum('AVAILABLE','INUSE') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `status` enum('AVAILABLE','INUSE','WAITING') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `is_lock` boolean NOT NULL DEFAULT true,
   `used_by` int DEFAULT NULL,
+  `gpio` int NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -69,7 +72,7 @@ CREATE TABLE `lockers` (
 
 LOCK TABLES `lockers` WRITE;
 /*!40000 ALTER TABLE `lockers` DISABLE KEYS */;
-INSERT INTO `lockers` VALUES (1,'A1','INUSE',9,'2023-08-20 04:34:54','2023-09-02 07:06:07'),(2,'A2','AVAILABLE',NULL,'2023-08-20 04:35:24','2023-08-21 14:07:00'),(3,'A3','AVAILABLE',NULL,'2023-08-20 04:35:24','2023-08-20 04:35:24'),(4,'A4','INUSE',8,'2023-08-20 04:35:24','2023-08-31 15:07:36');
+INSERT INTO `lockers` VALUES (1,'A1','INUSE',true,9,27,'2023-08-20 04:34:54','2023-09-02 07:06:07'),(2,'A2','AVAILABLE',true,NULL,22,'2023-08-20 04:35:24','2023-08-21 14:07:00'),(3,'A3','AVAILABLE',true,NULL,23,'2023-08-20 04:35:24','2023-08-20 04:35:24'),(4,'A4','INUSE',true,8,25,'2023-08-20 04:35:24','2023-08-31 15:07:36');
 /*!40000 ALTER TABLE `lockers` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -82,7 +85,7 @@ DROP TABLE IF EXISTS `users`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `users` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `pin` varchar(6) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `pin` varchar(4) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `iris_image` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
   `iris_template` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
   `total_fail_pin` int NOT NULL,
@@ -98,11 +101,6 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
-LOCK TABLES `users` WRITE;
-/*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (3,'123456',NULL,NULL,0,0,'PENDING','2023-08-27 17:10:57','2023-08-27 17:10:57'),(4,'135791',NULL,NULL,0,0,'PENDING','2023-08-27 17:43:46','2023-08-27 17:43:46'),(5,'121212',NULL,NULL,0,0,'PENDING','2023-08-30 16:03:21','2023-08-30 16:03:21'),(6,'121212',NULL,NULL,0,0,'PENDING','2023-08-30 23:19:52','2023-08-30 23:19:52'),(7,'135791',NULL,NULL,0,0,'PENDING','2023-08-31 01:16:10','2023-08-31 01:16:10'),(8,'456789',NULL,NULL,0,0,'PENDING','2023-08-31 15:07:36','2023-08-31 15:07:36'),(9,'141414',NULL,NULL,0,0,'PENDING','2023-09-02 07:06:07','2023-09-02 07:06:07');
-/*!40000 ALTER TABLE `users` ENABLE KEYS */;
-UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

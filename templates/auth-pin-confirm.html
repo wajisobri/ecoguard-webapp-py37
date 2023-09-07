@@ -108,26 +108,6 @@
 								autocomplete="no"
 								pattern="\d*"
 							/>
-							<input
-								class="font-h2-strong"
-								placeholder="_"
-								type="number"
-								step="1"
-								min="0"
-								max="9"
-								autocomplete="no"
-								pattern="\d*"
-							/>
-							<input
-								class="font-h2-strong"
-								placeholder="_"
-								type="number"
-								step="1"
-								min="0"
-								max="9"
-								autocomplete="no"
-								pattern="\d*"
-							/>
 						</div>
 
 						<form
@@ -218,8 +198,8 @@
 		</div>
 
 		<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
-		<script src="{{ url_for('static', filename='js/pin-input.js') }}"></script>
 		<script src="{{ url_for('static', filename='js/sweetalert2.all.min.js') }}"></script>
+		<script src="{{ url_for('static', filename='js/pin-input.js') }}"></script>
 		{% with messages = get_flashed_messages(with_categories=true) %} {% if
 		messages %} {% if messages.0[0] == 'error' %}
 

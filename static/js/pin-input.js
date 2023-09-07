@@ -10,7 +10,7 @@ window.addEventListener("load", function () {
 	const enterNumpad = document.querySelectorAll(".num-item");
 	enterNumpad.forEach((item) => {
 		item.addEventListener("click", (e) => {
-			if (curPointer >= 5) return;
+			if (curPointer >= 3) return;
 
 			const value = e.target.innerText;
 			curIndex = Array.from(inputs).findIndex((input) => !input.value);
@@ -43,7 +43,11 @@ window.addEventListener("load", function () {
 		curPointer = -1;
 
 		if (OTPValueContainer.value.includes("*")) {
-			alert("Please enter all OTP digits");
+			Swal.fire({
+				icon: "error",
+				title: "Oops...",
+				text: "Please enter the complete PIN",
+			});
 			return;
 		}
 

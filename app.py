@@ -117,13 +117,14 @@ def stream_camera():
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT,480)
     camera.set(cv2.CAP_PROP_FPS, 10)
     
-    while True:
-        print("Read Camera")
+    i = 0
+    for i in range (30):
+        print("Read Camera Frame" + str(i) + "...")
         # ~ frame = vs.read()
         ret, frame = camera.read()
         
-        # ~ time.sleep(0.1)
-        # ~ frame = imutils.resize(frame, width=640)
+        # time.sleep(0.1)
+        frame = imutils.resize(frame, width=640)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         gray = cv2.GaussianBlur(gray, (7, 7), 0)
         
@@ -131,8 +132,8 @@ def stream_camera():
         cv2.putText(frame, timestamp.strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
         outputFrame = frame.copy()
         
-        filename = timestamp.strftime("%Y%m%d%H%M%S") + ".jpg"
-        cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], filename), gray)
+        # filename = timestamp.strftime("%Y%m%d%H%M%S") + ".jpg"
+        # cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], filename), gray)
             
         (flag, encodedImage) = cv2.imencode(".jpg", gray)
         
@@ -140,6 +141,19 @@ def stream_camera():
             continue
         
         yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
+
+    # bypass authentication after 30 frame
+    update_locker_status()
+
+def update_locker_status(code=None):
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT * FROM lockers WHERE code = %s", [code])
+    locker = cursor.fetchone()
+
+    cursor.execute("UPDATE users SET status = %s WHERE id = %s", ('ACTIVE', locker.used_by))
+    mysql.connection.commit()
+    cursor.close()
+
 # ...
 # Routing
 # ...
@@ -147,8 +161,6 @@ def stream_camera():
 # Video Feed
 @app.route("/video_feed")
 def video_feed():
-	# return the response generated along with the specific media
-	# type (mime type)
 	return Response(stream_camera(),
 		mimetype = "multipart/x-mixed-replace; boundary=frame")
 
@@ -207,24 +219,38 @@ def locker(action=None):
             status = ''
             anchor_status = True
 
-            if row[3] == None:
-                if row[2] == 'AVAILABLE':
+            # locker.used_by is null
+            if row[4] == None:
+                # locker.status is available or waiting
+                if row[2] == 'AVAILABLE' or row[2] == 'WAITING':
                     status = 'Available'
+
+                # locker.status is inuse
                 else:
                     status = 'In Use'
                     anchor_status = False
 
+            # locker.used_by is not null
             else:
                 cursor = mysql.connection.cursor()
-                cursor.execute("SELECT * FROM users WHERE id = %s", [row[3]])
+                cursor.execute("SELECT * FROM users WHERE id = %s", [row[4]])
                 user = cursor.fetchone()
                 cursor.close()
 
-                if user[6] == 'PENDING':
+                # user is not found
+                if user == None:
                     status = 'Available'
-                else:
-                    status = 'In Use'
-                    anchor_status = False
+
+                # user is found
+                else:      
+                    # user.status is pending or inactive
+                    if user[6] == 'PENDING' or user[6] == 'INACTIVE':
+                        status = 'Available'
+
+                    # user.status is active
+                    else:
+                        status = 'In Use'
+                        anchor_status = False
 
             locker_list.append({
                 'id': row[0],
@@ -242,25 +268,41 @@ def locker(action=None):
         for row in lockers:
             status = ''
             anchor_status = True
-            if row[3] == None:
+
+            # locker.used_by is null
+            if row[4] == None:
                 status = 'Empty'
                 anchor_status = False
 
+            # locker.used_by is not null
             else:
-                if row[2] == 'AVAILABLE':
+                # locker.status is available or waiting
+                if row[2] == 'AVAILABLE' or row[2] == 'WAITING':
                     status = 'Empty'
                     anchor_status = False
+
+                # locker.status is inuse
                 else:
                     cursor = mysql.connection.cursor()
-                    cursor.execute("SELECT * FROM users WHERE id = %s", [row[3]])
+                    cursor.execute("SELECT * FROM users WHERE id = %s", [row[4]])
                     user = cursor.fetchone()
                     cursor.close()
 
-                    if user[6] == 'PENDING':
+                    # user is not found
+                    if user == None:
                         status = 'Empty'
                         anchor_status = False
+
+                    # user is found
                     else:
-                        status = 'Ready'
+                        # user.status is pending
+                        if user[6] == 'PENDING':
+                            status = 'Empty'
+                            anchor_status = False
+                        
+                        # user.status is active or inactive
+                        else:
+                            status = 'Ready'
 
             locker_list.append({
                 'id': row[0],
@@ -297,17 +339,26 @@ def auth_pin(locker_code=None):
 
     # define anchor can be clicked or not
     anchor_status = True
-    if row[3] == None:
-        if row[2] == 'AVAILABLE':
+
+    # locker.used_by is null
+    if row[4] == None:
+        # locker.status is available or waiting
+        if row[2] == 'AVAILABLE' or row[2] == 'WAITING':
             status = 'Available'
+
+        # locker.status is inuse
         else:
             status = 'In Use'
             anchor_status = False
 
+    # locker.used_by is not null
     else:
-        if row[2] == 'AVAILABLE':
+        # locker.status is available or waiting
+        if row[2] == 'AVAILABLE' or row[2] == 'WAITING':
             status = 'Empty'
             anchor_status = False
+        
+        # locker.status is inuse
         else:
             status = 'Ready'
 
@@ -330,6 +381,7 @@ def auth_pin(locker_code=None):
 # Pin Input (Validation): Keep Device & Pick up Device
 @app.route('/auth/pin/<locker_code>/validate', methods=['POST'])
 def auth_pin_validate(locker_code=None):
+    # check if pin input is empty or not
     if not request.form.get('pin_full'):
         return redirect('/auth/pin/' + locker_code)
     
@@ -348,37 +400,38 @@ def auth_pin_validate(locker_code=None):
         user = cursor.fetchone()
         cursor.close()
 
-        if user[6] == 'PENDING':
-            cursor = mysql.connection.cursor()
-            cursor.execute("INSERT INTO users (pin, total_fail_pin, total_fail_iris, status) VALUES (%s, %s, %s, %s)", (request.form.get('pin_full'), 0, 0, 'PENDING'))
-            mysql.connection.commit() 
-            new_user_id = cursor.lastrowid
-            cursor.execute("UPDATE lockers SET status = %s, used_by = %s WHERE code = %s", ('INUSE', new_user_id, locker_code))
-            mysql.connection.commit()
-            cursor.close()
+        if user != None:
+            if user[6] == 'PENDING':
+                cursor = mysql.connection.cursor()
+                cursor.execute("INSERT INTO users (pin, total_fail_pin, total_fail_iris, status) VALUES (%s, %s, %s, %s)", (request.form.get('pin_full'), 0, 0, 'PENDING'))
+                mysql.connection.commit() 
+                new_user_id = cursor.lastrowid
+                cursor.execute("UPDATE lockers SET status = %s, used_by = %s WHERE code = %s", ('INUSE', new_user_id, locker_code))
+                mysql.connection.commit()
+                cursor.close()
 
-            return redirect('/auth/pin/confirm/' + locker_code)
+                return redirect('/auth/pin/confirm/' + locker_code)
         
-        if user[4] > 5:
-            # return with error fail more than 5 times
-            return redirect('/auth/pin/' + locker_code)
+            if user[4] > 5:
+                # return with error fail more than 5 times
+                return redirect('/auth/pin/' + locker_code)
 
-        if user[1] == request.form.get('pin_full'):
-            return redirect('/auth/iris/' + locker_code)
-        
-        else:
-            cursor = mysql.connection.cursor()
-            cursor.execute("UPDATE users SET total_fail_pin = %s WHERE id = %s", (user[4] + 1, user[0]))
-            mysql.connection.commit()
-            cursor.close()
-            return redirect('/auth/pin/' + locker_code)
+            if user[1] == request.form.get('pin_full'):
+                return redirect('/auth/iris/' + locker_code)
+            
+            else:
+                cursor = mysql.connection.cursor()
+                cursor.execute("UPDATE users SET total_fail_pin = %s WHERE id = %s", (user[4] + 1, user[0]))
+                mysql.connection.commit()
+                cursor.close()
+                return redirect('/auth/pin/' + locker_code)
 
     # insert new data
     cursor = mysql.connection.cursor()
-    cursor.execute("INSERT INTO users (pin, total_fail_pin, total_fail_iris, status) VALUES (%s, %s, %s, %s)", (request.form.get('pin_full'), 0, 0, 'PENDING'))
+    cursor.execute("INSERT INTO users (pin, total_fail_pin, total_fail_iris, status) VALUES (%s, %s, %s, %s)", (request.form.get('pin_full'), 0, 0, 'INACTIVE'))
     mysql.connection.commit() 
     new_user_id = cursor.lastrowid
-    cursor.execute("UPDATE lockers SET status = %s, used_by = %s WHERE code = %s", ('INUSE', new_user_id, locker_code))
+    cursor.execute("UPDATE lockers SET status = %s, used_by = %s WHERE code = %s", ('WAITING', new_user_id, locker_code))
     mysql.connection.commit()
     cursor.close()
 
@@ -448,19 +501,36 @@ def auth_pin_confirm_validate(locker_code=None):
     locker = cursor.fetchone()
     cursor.close()
 
-    if locker[3] != None:
+    if locker[4] != None:
         cursor = mysql.connection.cursor()
-        cursor.execute("SELECT * FROM users WHERE id = %s", [locker[3]])
+        cursor.execute("SELECT * FROM users WHERE id = %s", [locker[4]])
         user = cursor.fetchone()
         cursor.close()
 
         if user[1] == request.form.get('pin_full'):
+            # update user status
+            cursor = mysql.connection.cursor()
+            cursor.execute("UPDATE users SET status = %s WHERE id = %s", ('PENDING', user[0]))
+            mysql.connection.commit()
+
+            # insert auth logs
+            cursor.execute("INSERT INTO auth_logs (user_id, locker_id, auth_type, action, status) VALUES (%s, %s, %s, %s, %s)", (user[0], locker[0], 'PIN', 'KEEP', 'VALID'))
+            mysql.connection.commit()
+            cursor.close()
+
             return redirect('/auth/iris/' + locker_code)
         
         else:
+            cursor = mysql.connection.cursor()
+            # insert auth logs
+            cursor.execute("INSERT INTO auth_logs (user_id, locker_id, auth_type, action, status) VALUES (%s, %s, %s, %s, %s)", (user[0], locker[0], 'PIN', 'KEEP', 'INVALID'))
+            mysql.connection.commit()
+            cursor.close()
+
             flash(u'Pin is not match', 'error')
             return redirect('/auth/pin/confirm/' + locker_code)
 
+    flash(u'Locker is in use', 'error')
     return redirect('/auth/pin/confirm/' + locker_code)
 
 # Iris Scan: Keep Device & Pick up Device
@@ -567,11 +637,12 @@ def locker_state(locker_code=None):
         'status': "",
     }
 
-    if locker[3] == None:
+    if locker[4] == None:
         data['status'] = 'NO_STEP'
+
     else:
         cursor = mysql.connection.cursor()
-        cursor.execute("SELECT * FROM users WHERE id = %s", [locker[3]])
+        cursor.execute("SELECT * FROM users WHERE id = %s", [locker[4]])
         user = cursor.fetchone()
         cursor.close()
 

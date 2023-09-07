@@ -34,13 +34,13 @@ body {
 /* Chrome, Safari, Edge, Opera */
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+	-webkit-appearance: none;
+	margin: 0;
 }
 
 /* Firefox */
-input[type=number] {
-  -moz-appearance: textfield;
+input[type="number"] {
+	-moz-appearance: textfield;
 }
 
 .sub-title {
@@ -313,7 +313,7 @@ input[type=number] {
 	border-radius: 4px;
 	outline: none;
 	height: 80px;
-	width: 50px;
+	width: 75px;
 }
 
 #pin_single input:focus {
