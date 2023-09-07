@@ -108,8 +108,11 @@
 									<div class="overlay-element bottom-right"></div>
 								</div>
 							</div>
-							<video autoplay playsinline id="videoElement"></video>
+							<img src="{{ url_for('video_feed') }}" width="400" height="300">
+<!--
+							<video autoplay="" muted="" playsinline="" id="videoElement"></video>
 							<canvas id="canvas" width="400" height="300"></canvas>
+-->
 							<!-- <video autoplay playsinline id="videoElement"></video> -->
 							<!-- <video autoplay="true" id="video-element"></video> -->
 						</div>
@@ -132,7 +135,9 @@
 		</div>
 
 		<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
-		<!-- <script src="{{ url_for('static', filename='js/script.js') }}"></script> -->
+<!--
+		<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+-->
 		<!-- <script src="{{ url_for('static', filename='js/auth.js') }}"></script> -->
 		<!-- <script src="{{ url_for('static', filename='js/camera.js') }}"></script> -->
 	</body>

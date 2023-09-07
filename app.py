@@ -1,13 +1,16 @@
 import os
 # import RPi.GPIO as GPIO
 from flask import Flask, flash, render_template, redirect, request, Response, jsonify
-from flask_socketio import SocketIO, emit
+# ~ from flask_socketio import SocketIO, emit
 from flask_mysqldb import MySQL
 from dotenv import load_dotenv
+from imutils.video import VideoStream
+import imutils
 import os
 import base64
 import numpy as np
 import cv2
+import time
 from datetime import datetime
 
 load_dotenv()
@@ -16,6 +19,7 @@ load_dotenv()
 STATIC_FOLDER = 'static'
 UPLOAD_FOLDER = "static/uploads/"
 BUCKET = "ecoguard-chargebox"
+outputFrame = None
 
 # Flask & MySQL Setup
 app = Flask(__name__)
@@ -23,25 +27,25 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['static_url_path'] = STATIC_FOLDER
 app.config['MYSQL_HOST'] = os.getenv("MYSQL_HOST")
 app.config['MYSQL_USER'] = os.getenv("MYSQL_USER")
-app.config['MYSQL_PASSWORD'] = os.getenv("MYSQL_PASSWORD")
+app.config['MYSQL_PASSWORD'] = os.getenv("MYSQL_PASS")
 app.config['MYSQL_DB'] = os.getenv("MYSQL_DB")
 app.config['SECRET_KEY'] = "ecoguard-chargebox"
 mysql = MySQL(app)
-socketio = SocketIO(app, cors_allowed_origins='*')
+# ~ socketio = SocketIO(app, cors_allowed_origins='*')
 
 # GPIO Pin Setup
 # GPIO.setmode(GPIO.BCM)
 # pins = {
-#     8 : {
-#          'name' : 'GPIO 8',
+#     27 : {
+#          'name' : 'GPIO 27',
 #         'state' : GPIO.LOW
 #     },
-#     23 : {
-#        'name' : 'GPIO 23',
+#     22 : {
+#        'name' : 'GPIO 22',
 #        'state' : GPIO.LOW
 #     },
-#     24 : {
-#         'name' : 'GPIO 24',
+#     23 : {
+#         'name' : 'GPIO 23',
 #         'state' : GPIO.LOW
 #     },
 #     25 : {
@@ -58,36 +62,36 @@ socketio = SocketIO(app, cors_allowed_origins='*')
 # Socket.IO
 # ...
 
-@socketio.on("connect")
-def test_connect():
-    print("Connected")
-    emit("my response", {"data": "Connected"})
+# ~ @socketio.on("connect")
+# ~ def test_connect():
+    # ~ print("Connected")
+    # ~ emit("my response", {"data": "Connected"})
 
-@socketio.on("image")
-def receive_image(image):
-    # Decode the base64-encoded image data
-    image = base64_to_image(image)
+# ~ @socketio.on("image")
+# ~ def receive_image(image):
+    # ~ # Decode the base64-encoded image data
+    # ~ image = base64_to_image(image)
 
-    # Perform image processing using OpenCV
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    frame_resized = cv2.resize(gray, (640, 360))
+    # ~ # Perform image processing using OpenCV
+    # ~ gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # ~ frame_resized = cv2.resize(gray, (640, 360))
 
-    # Encode the processed image as a JPEG-encoded base64 string
-    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
-    result, frame_encoded = cv2.imencode(".jpg", frame_resized, encode_param)
-    processed_img_data = base64.b64encode(frame_encoded).decode()
+    # ~ # Encode the processed image as a JPEG-encoded base64 string
+    # ~ encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
+    # ~ result, frame_encoded = cv2.imencode(".jpg", frame_resized, encode_param)
+    # ~ processed_img_data = base64.b64encode(frame_encoded).decode()
 
-    # Prepend the base64-encoded string with the data URL prefix
-    b64_src = "data:image/jpg;base64,"
-    processed_img_data = b64_src + processed_img_data
+    # ~ # Prepend the base64-encoded string with the data URL prefix
+    # ~ b64_src = "data:image/jpg;base64,"
+    # ~ processed_img_data = b64_src + processed_img_data
 
-    # Save the processed image to the uploads folder with datetime as filename
-    # now = datetime.now()
-    # filename = now.strftime("%Y%m%d%H%M%S") + ".jpg"
-    # cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], filename), frame_resized)
+    # ~ # Save the processed image to the uploads folder with datetime as filename
+    # ~ # now = datetime.now()
+    # ~ # filename = now.strftime("%Y%m%d%H%M%S") + ".jpg"
+    # ~ # cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], filename), frame_resized)
 
-    # Send the processed image back to the client
-    emit("processed_image", processed_img_data)
+    # ~ # Send the processed image back to the client
+    # ~ emit("processed_image", processed_img_data)
 
 # ...
 # Function
@@ -104,9 +108,49 @@ def base64_to_image(base64_string):
     image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
     return image
 
+def stream_camera():
+    global outputFrame
+    
+    # ~ vs = VideoStream(usePicamera=1).start()
+    camera = cv2.VideoCapture(0)
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH,640)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT,480)
+    camera.set(cv2.CAP_PROP_FPS, 10)
+    
+    while True:
+        print("Read Camera")
+        # ~ frame = vs.read()
+        ret, frame = camera.read()
+        
+        # ~ time.sleep(0.1)
+        # ~ frame = imutils.resize(frame, width=640)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.GaussianBlur(gray, (7, 7), 0)
+        
+        timestamp = datetime.now()
+        cv2.putText(frame, timestamp.strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
+        outputFrame = frame.copy()
+        
+        filename = timestamp.strftime("%Y%m%d%H%M%S") + ".jpg"
+        cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], filename), gray)
+            
+        (flag, encodedImage) = cv2.imencode(".jpg", gray)
+        
+        if not flag:
+            continue
+        
+        yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
 # ...
 # Routing
 # ...
+
+# Video Feed
+@app.route("/video_feed")
+def video_feed():
+	# return the response generated along with the specific media
+	# type (mime type)
+	return Response(stream_camera(),
+		mimetype = "multipart/x-mixed-replace; boundary=frame")
 
 # Landing Page
 @app.route('/', methods=['GET'])
