@@ -1,10 +1,9 @@
 import os
 # import RPi.GPIO as GPIO
 from flask import Flask, flash, render_template, redirect, request, Response, jsonify
-# ~ from flask_socketio import SocketIO, emit
 from flask_mysqldb import MySQL
 from dotenv import load_dotenv
-from imutils.video import VideoStream
+# from imutils.video import VideoStream
 import imutils
 import os
 import base64
@@ -12,6 +11,8 @@ import numpy as np
 import cv2
 import time
 from datetime import datetime
+import modules.extractFeature as extractFeature
+from scipy.io import savemat
 
 load_dotenv()
 
@@ -31,13 +32,12 @@ app.config['MYSQL_PASSWORD'] = os.getenv("MYSQL_PASS")
 app.config['MYSQL_DB'] = os.getenv("MYSQL_DB")
 app.config['SECRET_KEY'] = "ecoguard-chargebox"
 mysql = MySQL(app)
-# ~ socketio = SocketIO(app, cors_allowed_origins='*')
 
 # GPIO Pin Setup
 # GPIO.setmode(GPIO.BCM)
 # pins = {
 #     27 : {
-#          'name' : 'GPIO 27',
+#         'name' : 'GPIO 27',
 #         'state' : GPIO.LOW
 #     },
 #     22 : {
@@ -59,44 +59,58 @@ mysql = MySQL(app)
 #    GPIO.output(pin, GPIO.LOW)
 
 # ...
-# Socket.IO
-# ...
-
-# ~ @socketio.on("connect")
-# ~ def test_connect():
-    # ~ print("Connected")
-    # ~ emit("my response", {"data": "Connected"})
-
-# ~ @socketio.on("image")
-# ~ def receive_image(image):
-    # ~ # Decode the base64-encoded image data
-    # ~ image = base64_to_image(image)
-
-    # ~ # Perform image processing using OpenCV
-    # ~ gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    # ~ frame_resized = cv2.resize(gray, (640, 360))
-
-    # ~ # Encode the processed image as a JPEG-encoded base64 string
-    # ~ encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
-    # ~ result, frame_encoded = cv2.imencode(".jpg", frame_resized, encode_param)
-    # ~ processed_img_data = base64.b64encode(frame_encoded).decode()
-
-    # ~ # Prepend the base64-encoded string with the data URL prefix
-    # ~ b64_src = "data:image/jpg;base64,"
-    # ~ processed_img_data = b64_src + processed_img_data
-
-    # ~ # Save the processed image to the uploads folder with datetime as filename
-    # ~ # now = datetime.now()
-    # ~ # filename = now.strftime("%Y%m%d%H%M%S") + ".jpg"
-    # ~ # cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], filename), frame_resized)
-
-    # ~ # Send the processed image back to the client
-    # ~ emit("processed_image", processed_img_data)
-
-# ...
 # Function
 # ...
 
+def toggle_pin(pin, action):
+    if action == 'on':
+        GPIO.output(pin, GPIO.HIGH)
+        pins[pin]['state'] = GPIO.HIGH
+    else:
+        GPIO.output(pin, GPIO.LOW)
+        pins[pin]['state'] = GPIO.LOW
+
+def base64_to_image(base64_string):
+    base64_data = base64_string.split(",")[1]
+    image_bytes = base64.b64decode(base64_data)
+    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    return image
+
+def enroll_iris(locker_code, frame):
+    # Save image to local storage
+    timestamp = datetime.now()
+    filename = "image_" + timestamp.strftime("%Y%m%d%H%M%S") + ".jpg"
+    cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], filename), frame)
+
+    # Update Database
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT * FROM lockers WHERE code = %s", [locker_code])
+    locker = cursor.fetchone()
+
+    cursor.execute("SELECT * FROM users WHERE id = %s", [locker[4]])
+    user = cursor.fetchone()
+
+    if user != None:
+        # Extract feature
+        template, mask, file = extractFeature(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+        # Save extracted feature
+        basename = os.path.basename(file)
+        out_file = os.path.join(app.config['UPLOAD_FOLDER'], "template_%s.mat" % (basename))
+        savemat(out_file, mdict={'template':template, 'mask':mask})
+
+        # TODO: Upload to AWS S3
+        
+        cursor.execute("UPDATE users SET iris_image = %s, iris_template = %s, status = %s WHERE id = %s", (filename, out_file, 'ACTIVE', user[0]))
+        mysql.connection.commit()
+        cursor.close()
+        return True
+    
+    else:
+        cursor.close()
+        return False
+        
 def white_balance(img):
     result = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
     avg_a = np.average(result[:, :, 1])
@@ -117,7 +131,7 @@ def base64_to_image(base64_string):
     image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
     return image
 
-def stream_camera():
+def stream_camera(locker_code=None):
     global outputFrame
     
     # ~ vs = VideoStream(usePicamera=1).start()
@@ -127,13 +141,12 @@ def stream_camera():
     camera.set(cv2.CAP_PROP_FPS, 10)
     
     i = 0
-    while True:
-        print("Read Camera Frame" + str(i) + "...")
-        i += 1
+    for i in range (30):
+        print("Read Camera Frame " + str(i))
         # ~ frame = vs.read()
         ret, frame = camera.read()
         
-        # time.sleep(0.1)
+        time.sleep(0.1)
         frame = imutils.resize(frame, width=640)
         wb = white_balance(frame)
         # ~ gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -154,7 +167,7 @@ def stream_camera():
         yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
 
     # bypass authentication after 30 frame
-    # ~ update_locker_status()
+    update_locker_status(locker_code)
 
 def update_locker_status(code=None):
     cursor = mysql.connection.cursor()
@@ -165,15 +178,16 @@ def update_locker_status(code=None):
     mysql.connection.commit()
     cursor.close()
 
+    redirect('/auth/iris/confirm/' +  locker.code)
+
 # ...
 # Routing
 # ...
 
 # Video Feed
-@app.route("/video_feed")
-def video_feed():
-	return Response(stream_camera(),
-		mimetype = "multipart/x-mixed-replace; boundary=frame")
+@app.route('/video_feed/<locker_code>', methods=['GET'])
+def video_feed(locker_code=None):
+	return Response(stream_camera(locker_code), mimetype = "multipart/x-mixed-replace; boundary=frame")
 
 # Landing Page
 @app.route('/', methods=['GET'])
@@ -591,88 +605,90 @@ def auth_iris(locker_code=None):
         return render_template('auth-iris.html', locker_detail=locker_detail)
     
     return redirect('/menu')
-    
-# Iris Scan (Validation): Keep Device & Pick up Device
-# @app.route('/auth/iris/<locker_code>/validate', methods=['POST'])
-# def auth_iris_validate(locker_code=None):
-#     if not request.form.get('iris_full'):
-#         return redirect('/auth/iris/' + locker_code)
-    
-#     # get locker detail
-#     cursor = mysql.connection.cursor()
-#     cursor.execute("SELECT * FROM lockers WHERE code = %s", [locker_code])
-#     locker = cursor.fetchone()
-#     cursor.close()
 
-#     # if locker in use
-#     if locker[3] != None:
-#         cursor = mysql.connection.cursor()
-#         cursor.execute("SELECT * FROM users WHERE id = %s", [locker[3]])
-#         user = cursor.fetchone()
-#         cursor.close()
-
-#         # check if user iris fail more than 5 times
-#         if user[5] > 5:
-#             # return error message
-#             return redirect('/auth/iris/' + locker_code)
-        
-#         # TODO: process iris input -> iris image to iris template (encoding)
-
-#         # TODO: process upload iris image and iris template to cloud storage (AWS S3)
-
-#         # TODO: check if iris scan match with template or not
-#         processed_iris_input = ""
-#         if user[3] == processed_iris_input:
-#             return redirect('/waiting/' + locker_code)
-        
-#         else:
-#             cursor = mysql.connection.cursor()
-#             cursor.execute("UPDATE users SET total_fail_iris = %s WHERE id = %s", (user[3] + 1, user[0]))
-#             mysql.connection.commit()
-#             cursor.close()
-#             return redirect('/auth/iris/' + locker_code)
-
-#     return redirect('/auth/iris/' + locker_code)
-
-# Get Current Locker State
-@app.route('/locker/<locker_code>/state', methods=['GET'])
-def locker_state(locker_code=None):
+@app.route('/auth/iris/confirm/<locker_code>', methods=['GET'])
+def auth_iris_confirm(locker_code=None):
     cursor = mysql.connection.cursor()
     cursor.execute("SELECT * FROM lockers WHERE code = %s", [locker_code])
     locker = cursor.fetchone()
+
+    cursor.execute("SELECT * FROM users WHERE id = %s", [locker[4]])
+    user = cursor.fetchone()
+
     cursor.close()
 
-    data = {
+    locker_detail = {
         'id': locker[0],
         'code': locker[1],
-        'status': "",
+        'status': locker[2],
+        'used_by': locker[3],
+        'created_at': locker[4],
+        'updated_at': locker[5],
+        'anchor_status': locker[6]
     }
 
-    if locker[4] == None:
-        data['status'] = 'NO_STEP'
+    user_detail = {
+        'id': user[0],
+        'pin': user[1],
+        'iris_image': user[2],
+        'iris_template': user[3],
+        'total_fail_pin': user[4],
+        'total_fail_iris': user[5],
+        'status': user[6],
+        'created_at': user[7],
+        'updated_at': user[8]
+    }
 
-    else:
-        cursor = mysql.connection.cursor()
-        cursor.execute("SELECT * FROM users WHERE id = %s", [locker[4]])
-        user = cursor.fetchone()
-        cursor.close()
+    if user[2] == None:
+        user_detail['iris_image'] = ''
 
-        if user[6] == 'PENDING':
-            data['status'] = 'STEP_PIN'
-        else:
-            data['status'] = 'STEP_IRIS'
+    if user[3] == None:
+        user_detail['iris_template'] = ''
 
-    return jsonify(data)
+    return render_template('auth-iris-confirm.html', locker_detail=locker_detail, user_detail=user_detail)
+    
+# Iris Scan (Validation): Keep Device & Pick up Device
+@app.route('/auth/iris/confirm/<locker_code>/validate', methods=['POST'])
+def auth_iris_confirm_validate(locker_code=None):
+    if not request.form.get('auth_action'):
+        return redirect('/auth/iris/confirm/' + locker_code)
+
+    if request.form.get('auth_action') == "re-capture":
+        return redirect('/auth/iris/' + locker_code)
+    
+    # TODO: Open Lock of Locker using GPIO
+
+    # TODO: Redirect to Waiting Page
+    return redirect('/waiting/keep/' + locker_code)
 
 # Waiting: Keep Device & Pick up Device
-@app.route('/waiting/<action>', methods=['GET'])
-def waiting(action=None):
-    return render_template('waiting.html')
+@app.route('/waiting/<action>/<locker_code>', methods=['GET'])
+def waiting(action=None, locker_code=None):
+    message = ''
+    if action == 'keep':
+        message = 'Locker ' + locker_code + ' is now unlocked, please keep your device as soon as possible'
+    else:
+        message = 'Locker ' + locker_code + ' is now unlocked, please pick up your device as soon as possible'
+
+    return render_template('waiting.html', message=message)
+
+@app.route('/watiing/<action>/<locker_code>/validate', methods=['POST'])
+def waiting_validate(action=None, locker_code=None):
+    # TODO: Close Lock of Locker using GPIO
+
+    # TODO: Redirect to Success Page
+    return redirect('/success/' + action)
 
 # Success: Keep Device & Pick up Device
-@app.route('/success/<action>', methods=['GET'])
-def success(action=None):
-    return render_template('success.html')
+@app.route('/success/<action>/<locker_code>', methods=['GET'])
+def success(action=None, locker_code=None):
+    message = ''
+    if action == 'keep':
+        message = 'Locker ' + locker_code + ' is now locked, your device is safe now'
+    else:
+        message = 'Thanks for using our service, please come again'
+
+    return render_template('success.html', message=message)
 
 if __name__ == '__main__':
     app.run(debug=True)
