@@ -97,6 +97,15 @@ mysql = MySQL(app)
 # Function
 # ...
 
+def white_balance(img):
+    result = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    avg_a = np.average(result[:, :, 1])
+    avg_b = np.average(result[:, :, 2])
+    result[:, :, 1] = result[:, :, 1] - ((avg_a - 128) * (result[:, :, 0] / 255.0) * 1.1)
+    result[:, :, 2] = result[:, :, 2] - ((avg_b - 128) * (result[:, :, 0] / 255.0) * 1.1)
+    result = cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
+    return result
+
 def base64_to_image(base64_string):
     # Extract the base64 encoded binary data from the input string
     base64_data = base64_string.split(",")[1]
@@ -118,24 +127,26 @@ def stream_camera():
     camera.set(cv2.CAP_PROP_FPS, 10)
     
     i = 0
-    for i in range (30):
+    while True:
         print("Read Camera Frame" + str(i) + "...")
+        i += 1
         # ~ frame = vs.read()
         ret, frame = camera.read()
         
         # time.sleep(0.1)
         frame = imutils.resize(frame, width=640)
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (7, 7), 0)
+        wb = white_balance(frame)
+        # ~ gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # ~ gray = cv2.GaussianBlur(gray, (7, 7), 0)
         
         timestamp = datetime.now()
-        cv2.putText(frame, timestamp.strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
-        outputFrame = frame.copy()
+        # ~ cv2.putText(frame, timestamp.strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
+        # ~ outputFrame = frame.copy()
         
         # filename = timestamp.strftime("%Y%m%d%H%M%S") + ".jpg"
         # cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], filename), gray)
             
-        (flag, encodedImage) = cv2.imencode(".jpg", gray)
+        (flag, encodedImage) = cv2.imencode(".jpg", wb)
         
         if not flag:
             continue
@@ -143,7 +154,7 @@ def stream_camera():
         yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
 
     # bypass authentication after 30 frame
-    update_locker_status()
+    # ~ update_locker_status()
 
 def update_locker_status(code=None):
     cursor = mysql.connection.cursor()
