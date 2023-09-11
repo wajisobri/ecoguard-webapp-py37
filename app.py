@@ -101,17 +101,35 @@ def enroll_iris(locker_code, frame):
         savemat(out_file, mdict={'template':template, 'mask':mask})
 
         # TODO: Upload to AWS S3
-
+        
         cursor.execute("UPDATE users SET iris_image = %s, iris_template = %s, status = %s WHERE id = %s", (filename, out_file, 'ACTIVE', user[0]))
         mysql.connection.commit()
         cursor.close()
-
         return True
     
     else:
         cursor.close()
         return False
+        
+def white_balance(img):
+    result = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    avg_a = np.average(result[:, :, 1])
+    avg_b = np.average(result[:, :, 2])
+    result[:, :, 1] = result[:, :, 1] - ((avg_a - 128) * (result[:, :, 0] / 255.0) * 1.1)
+    result[:, :, 2] = result[:, :, 2] - ((avg_b - 128) * (result[:, :, 0] / 255.0) * 1.1)
+    result = cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
+    return result
 
+def base64_to_image(base64_string):
+    # Extract the base64 encoded binary data from the input string
+    base64_data = base64_string.split(",")[1]
+    # Decode the base64 data to bytes
+    image_bytes = base64.b64decode(base64_data)
+    # Convert the bytes to numpy array
+    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    # Decode the numpy array as an image using OpenCV
+    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    return image
 
 def stream_camera(locker_code=None):
     global outputFrame
@@ -130,17 +148,18 @@ def stream_camera(locker_code=None):
         
         time.sleep(0.1)
         frame = imutils.resize(frame, width=640)
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (7, 7), 0)
+        wb = white_balance(frame)
+        # ~ gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # ~ gray = cv2.GaussianBlur(gray, (7, 7), 0)
         
         timestamp = datetime.now()
-        cv2.putText(frame, timestamp.strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
-        outputFrame = frame.copy()
+        # ~ cv2.putText(frame, timestamp.strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
+        # ~ outputFrame = frame.copy()
         
         # filename = timestamp.strftime("%Y%m%d%H%M%S") + ".jpg"
         # cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], filename), gray)
             
-        (flag, encodedImage) = cv2.imencode(".jpg", gray)
+        (flag, encodedImage) = cv2.imencode(".jpg", wb)
         
         if not flag:
             continue
