@@ -15,7 +15,7 @@ from datetime import datetime
 ##	(The following parameters are default for CASIA1 dataset)
 ##-----------------------------------------------------------------------------
 # Segmentation parameters
-eyelashes_thres = 80
+eyelashes_thres = 10
 
 # Normalisation parameters
 radial_res = 20
@@ -88,6 +88,7 @@ def extractFeature(im_filename, eyelashes_thres=10, use_multiprocess=True):
 	timestamp = datetime.now()
 	filename = "plot_"+ timestamp.strftime("%Y%m%d%H%M%S") + ".jpg"
 	plt.savefig(os.path.join('static/uploads/', filename))
+	plt.close()
 
 	# Return
 	return template, mask, im_filename

@@ -108,25 +108,18 @@
 									<div class="overlay-element bottom-right"></div>
 								</div>
 							</div>
-							 <img src="{{ url_for('video_feed') }}" width="400" height="300"> 
+							<img src="{{ url_for('video_feed', locker_code=locker_detail.code) }}" width="430" height="300"> 
 							<!--<video autoplay="" muted="" playsinline="" id="videoElement"></video>
 							<canvas id="canvas" width="400" height="300"></canvas>-->
 							<!-- <video autoplay playsinline id="videoElement"></video> -->
 							<!-- <video autoplay="true" id="video-element"></video> -->
 						</div>
 
-						<div class="camera-footer item-info p-1">
-							<div class="status d-flex flex-row justify-content-start">
-								<ul class="m-0">
-									<li class="bullet-dark">
-										<span class="status-text fw-bold">Waiting</span>
-									</li>
-								</ul>
-								<!-- <div class="">Status</div> -->
-							</div>
-						</div>
-
-						</div>
+						<form action="{{ url_for('auth_iris_validate', locker_code=locker_detail.code) }}" method="POST">
+							<button class="btn btn-warning btn-lg fw-bold w-100 mt-2">
+								Next
+							</button>
+						</form>
 					</div>
 				</div>
 			</div>
