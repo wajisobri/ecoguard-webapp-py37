@@ -1,9 +1,10 @@
 import os
 # import RPi.GPIO as GPIO
-from flask import Flask, flash, render_template, redirect, request, Response, jsonify
+from flask import Flask, flash, render_template, redirect, request, Response, jsonify, url_for, stream_with_context, current_app
 from flask_mysqldb import MySQL
 from dotenv import load_dotenv
-# from imutils.video import VideoStream
+from picamerax import PiCamera
+from picamerax.array import PiRGBArray
 import imutils
 import os
 import base64
@@ -11,7 +12,7 @@ import numpy as np
 import cv2
 import time
 from datetime import datetime
-import modules.extractFeature as extractFeature
+from modules.extractFeature import extractFeature
 from scipy.io import savemat
 
 load_dotenv()
@@ -20,7 +21,10 @@ load_dotenv()
 STATIC_FOLDER = 'static'
 UPLOAD_FOLDER = "static/uploads/"
 BUCKET = "ecoguard-chargebox"
+
+# Global
 outputFrame = None
+streamActive = False
 
 # Flask & MySQL Setup
 app = Flask(__name__)
@@ -31,6 +35,8 @@ app.config['MYSQL_USER'] = os.getenv("MYSQL_USER")
 app.config['MYSQL_PASSWORD'] = os.getenv("MYSQL_PASS")
 app.config['MYSQL_DB'] = os.getenv("MYSQL_DB")
 app.config['SECRET_KEY'] = "ecoguard-chargebox"
+app.config['SERVER_NAME'] = '127.0.0.1:5000'
+
 mysql = MySQL(app)
 
 # GPIO Pin Setup
@@ -78,47 +84,43 @@ def base64_to_image(base64_string):
     return image
 
 def enroll_iris(locker_code, frame):
+    print("Start enrolling iris ...")
+    
     # Save image to local storage
     timestamp = datetime.now()
     filename = "image_" + timestamp.strftime("%Y%m%d%H%M%S") + ".jpg"
     cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], filename), frame)
 
     # Update Database
-    cursor = mysql.connection.cursor()
-    cursor.execute("SELECT * FROM lockers WHERE code = %s", [locker_code])
-    locker = cursor.fetchone()
+    with app.app_context():
+        cursor = mysql.connection.cursor()
+        cursor.execute("SELECT * FROM lockers WHERE code = %s", [locker_code])
+        locker = cursor.fetchone()
 
-    cursor.execute("SELECT * FROM users WHERE id = %s", [locker[4]])
-    user = cursor.fetchone()
+        cursor.execute("SELECT * FROM users WHERE id = %s", [locker[4]])
+        user = cursor.fetchone()
 
-    if user != None:
-        # Extract feature
-        template, mask, file = extractFeature(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        if user != None:
+            # Extract feature
+            template, mask, file = extractFeature(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-        # Save extracted feature
-        basename = os.path.basename(file)
-        out_file = os.path.join(app.config['UPLOAD_FOLDER'], "template_%s.mat" % (basename))
-        savemat(out_file, mdict={'template':template, 'mask':mask})
+            # Save extracted feature
+            basename = os.path.basename(file)
+            out_file = os.path.join(app.config['UPLOAD_FOLDER'], "template_%s.mat" % (basename))
+            savemat(out_file, mdict={'template':template, 'mask':mask})
 
-        # TODO: Upload to AWS S3
+            # TODO: Upload to AWS S3
+            
+            cursor.execute("UPDATE users SET iris_image = %s, iris_template = %s, status = %s WHERE id = %s", (filename, out_file, 'ACTIVE', user[0]))
+            mysql.connection.commit()
+            cursor.close()
+            print("End enrolling iris [success]...")
+            return True
         
-        cursor.execute("UPDATE users SET iris_image = %s, iris_template = %s, status = %s WHERE id = %s", (filename, out_file, 'ACTIVE', user[0]))
-        mysql.connection.commit()
-        cursor.close()
-        return True
-    
-    else:
-        cursor.close()
-        return False
-        
-def white_balance(img):
-    result = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    avg_a = np.average(result[:, :, 1])
-    avg_b = np.average(result[:, :, 2])
-    result[:, :, 1] = result[:, :, 1] - ((avg_a - 128) * (result[:, :, 0] / 255.0) * 1.1)
-    result[:, :, 2] = result[:, :, 2] - ((avg_b - 128) * (result[:, :, 0] / 255.0) * 1.1)
-    result = cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
-    return result
+        else:
+            cursor.close()
+            print("End enrolling iris [error]...")
+            return False
 
 def base64_to_image(base64_string):
     # Extract the base64 encoded binary data from the input string
@@ -131,54 +133,19 @@ def base64_to_image(base64_string):
     image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
     return image
 
-def stream_camera(locker_code=None):
-    global outputFrame
-    
-    # ~ vs = VideoStream(usePicamera=1).start()
-    camera = cv2.VideoCapture(0)
-    camera.set(cv2.CAP_PROP_FRAME_WIDTH,640)
-    camera.set(cv2.CAP_PROP_FRAME_HEIGHT,480)
-    camera.set(cv2.CAP_PROP_FPS, 10)
-    
-    i = 0
-    for i in range (30):
-        print("Read Camera Frame " + str(i))
-        # ~ frame = vs.read()
-        ret, frame = camera.read()
-        
-        time.sleep(0.1)
-        frame = imutils.resize(frame, width=640)
-        wb = white_balance(frame)
-        # ~ gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # ~ gray = cv2.GaussianBlur(gray, (7, 7), 0)
-        
-        timestamp = datetime.now()
-        # ~ cv2.putText(frame, timestamp.strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
-        # ~ outputFrame = frame.copy()
-        
-        # filename = timestamp.strftime("%Y%m%d%H%M%S") + ".jpg"
-        # cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], filename), gray)
-            
-        (flag, encodedImage) = cv2.imencode(".jpg", wb)
-        
-        if not flag:
-            continue
-        
-        yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
-
-    # bypass authentication after 30 frame
-    update_locker_status(locker_code)
-
 def update_locker_status(code=None):
-    cursor = mysql.connection.cursor()
-    cursor.execute("SELECT * FROM lockers WHERE code = %s", [code])
-    locker = cursor.fetchone()
+    print("Start updating locker status ...")
+    with app.app_context():
+        cursor = mysql.connection.cursor()
+        cursor.execute("SELECT * FROM lockers WHERE code = %s", [code])
+        locker = cursor.fetchone()
 
-    cursor.execute("UPDATE users SET status = %s WHERE id = %s", ('ACTIVE', locker.used_by))
-    mysql.connection.commit()
-    cursor.close()
-
-    redirect('/auth/iris/confirm/' +  locker.code)
+        cursor.execute("UPDATE users SET status = %s WHERE id = %s", ('ACTIVE', locker[4]))
+        mysql.connection.commit()
+        cursor.close()
+        
+        print("End updating locker status ...")
+        return True
 
 # ...
 # Routing
@@ -187,7 +154,69 @@ def update_locker_status(code=None):
 # Video Feed
 @app.route('/video_feed/<locker_code>', methods=['GET'])
 def video_feed(locker_code=None):
-	return Response(stream_camera(locker_code), mimetype = "multipart/x-mixed-replace; boundary=frame")
+    def stream_camera(locker_code=None):
+        global outputFrame
+        
+        # ~ camera = cv2.VideoCapture(0)
+        # ~ camera.set(cv2.CAP_PROP_FRAME_WIDTH,1920)
+        # ~ camera.set(cv2.CAP_PROP_FRAME_HEIGHT,1080)
+        # ~ camera.set(cv2.CAP_PROP_FPS, 10)
+        camera = PiCamera()
+        camera.resolution = (1920, 1080)
+        camera.framerate = 30
+        camera.awb_mode = 'greyworld'
+        rawCapture = PiRGBArray(camera, size=(1920, 1080))
+        
+        time.sleep(0.1)
+        
+        i = 0
+        for rawFrame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+            print("Read Camera Frame " + str(i))
+            # ~ ret, frame = camera.read()
+            frame = rawFrame.array
+            
+            time.sleep(0.1)
+            # ~ gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # ~ gray = cv2.GaussianBlur(gray, (7, 7), 0)
+            
+            h, w = frame.shape[:-1]
+            center_x, center_y = w // 2, h // 2
+            zoom_factor = 2
+            roi_width, roi_height = int(w / zoom_factor), int(h / zoom_factor)
+            roi_x = center_x - roi_width // 2
+            roi_y = center_y - roi_height // 2
+            roi = frame[roi_y:roi_y + roi_height, roi_x:roi_x + roi_width]
+            
+            timestamp = datetime.now()
+            # ~ cv2.putText(frame, timestamp.strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
+            
+            # filename = timestamp.strftime("%Y%m%d%H%M%S") + ".jpg"
+            # cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], filename), gray)
+                
+            (flag, encodedImage) = cv2.imencode(".jpg", roi)
+            
+            i += 1
+            rawCapture.truncate()
+            rawCapture.seek(0)
+            
+            if not flag:
+                continue
+            
+            yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
+            
+            if i == 29:
+                outputFrame = roi.copy()
+                break;
+
+        # bypass authentication after 30 frame
+        camera.close() 
+        enroll = enroll_iris(locker_code, outputFrame)
+        enroll = True
+        
+        if enroll == True:
+            update_locker_status(locker_code)
+    
+    return Response(stream_with_context(stream_camera(locker_code)), mimetype = "multipart/x-mixed-replace; boundary=frame")
 
 # Landing Page
 @app.route('/', methods=['GET'])
@@ -531,6 +560,12 @@ def auth_pin_confirm_validate(locker_code=None):
         cursor.execute("SELECT * FROM users WHERE id = %s", [locker[4]])
         user = cursor.fetchone()
         cursor.close()
+        
+        if user == None:
+            print("User not found")
+            
+        print(user[1])
+        print(request.form.get('pin_full'));
 
         if user[1] == request.form.get('pin_full'):
             # update user status
@@ -605,6 +640,10 @@ def auth_iris(locker_code=None):
         return render_template('auth-iris.html', locker_detail=locker_detail)
     
     return redirect('/menu')
+    
+@app.route('/auth/iris/<locker_code>/validate', methods=['POST'])
+def auth_iris_validate(locker_code=None):
+    return redirect(url_for('auth_iris_confirm', locker_code=locker_code))
 
 @app.route('/auth/iris/confirm/<locker_code>', methods=['GET'])
 def auth_iris_confirm(locker_code=None):
@@ -664,16 +703,40 @@ def auth_iris_confirm_validate(locker_code=None):
 # Waiting: Keep Device & Pick up Device
 @app.route('/waiting/<action>/<locker_code>', methods=['GET'])
 def waiting(action=None, locker_code=None):
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT * FROM lockers WHERE code = %s", [locker_code])
+    locker = cursor.fetchone()
+    cursor.close()
+
+    locker_detail = {
+        'id': locker[0],
+        'code': locker[1],
+        'status': locker[2],
+        'used_by': locker[3],
+        'created_at': locker[4],
+        'updated_at': locker[5],
+        'anchor_status': locker[6]
+    }
+    
     message = ''
     if action == 'keep':
         message = 'Locker ' + locker_code + ' is now unlocked, please keep your device as soon as possible'
     else:
         message = 'Locker ' + locker_code + ' is now unlocked, please pick up your device as soon as possible'
 
-    return render_template('waiting.html', message=message)
+    return render_template('waiting.html', message=message, locker_detail=locker_detail)
 
-@app.route('/watiing/<action>/<locker_code>/validate', methods=['POST'])
+@app.route('/waiting/<action>/<locker_code>/validate', methods=['POST'])
 def waiting_validate(action=None, locker_code=None):
+    if not request.form.get('confirm_action'):
+        return redirect('/waiting/' + action + '/' + locker_code)
+
+    if request.form.get('confirm_action') == "cancel":
+        # TODO: Set user to inactive
+        # TODO: Set locker status to available, used_by to empty
+        
+        return redirect('/auth/iris/' + locker_code)
+        
     # TODO: Close Lock of Locker using GPIO
 
     # TODO: Redirect to Success Page

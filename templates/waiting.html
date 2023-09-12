@@ -156,8 +156,13 @@
 
 				<div class="waiting-action">
 					<div class="d-flex gap-2">
-						<button class="btn btn-danger btn-lg fw-bold px-5">Cancel</button>
-						<button class="btn btn-primary btn-lg fw-bold px-5">Done</button>
+						<form
+							action="{{ url_for('waiting_validate', locker_code=locker_detail.code) }}"
+							method="POST"
+						>
+							<button type="submit" name="action" value="cancel" class="btn btn-danger btn-lg fw-bold px-5">Cancel</button>
+							<button type="submit" name="action" value="done" class="btn btn-primary btn-lg fw-bold px-5">Done</button>
+						</form>
 					</div>
 				</div>
 			</div>
