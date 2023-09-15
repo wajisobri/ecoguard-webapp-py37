@@ -204,7 +204,7 @@ def video_feed(locker_code=None):
             
             yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
             
-            if i == 29:
+            if i == 1000:
                 outputFrame = roi.copy()
                 break;
 
