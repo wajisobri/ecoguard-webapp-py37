@@ -1,5 +1,5 @@
 import os
-# import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
 from flask import Flask, flash, render_template, redirect, request, Response, jsonify, url_for, stream_with_context, current_app
 from flask_mysqldb import MySQL
 from dotenv import load_dotenv
@@ -40,29 +40,29 @@ app.config['SERVER_NAME'] = '127.0.0.1:5000'
 mysql = MySQL(app)
 
 # GPIO Pin Setup
-# GPIO.setmode(GPIO.BCM)
-# pins = {
-#     27 : {
-#         'name' : 'GPIO 27',
-#         'state' : GPIO.LOW
-#     },
-#     22 : {
-#        'name' : 'GPIO 22',
-#        'state' : GPIO.LOW
-#     },
-#     23 : {
-#         'name' : 'GPIO 23',
-#         'state' : GPIO.LOW
-#     },
-#     25 : {
-#         'name' : 'GPIO 25',
-#         'state' : GPIO.LOW
-#     },
-# }
+GPIO.setmode(GPIO.BCM)
+pins = {
+    27 : {
+        'name' : 'GPIO 27',
+        'state' : GPIO.LOW
+    },
+    22 : {
+        'name' : 'GPIO 22',
+        'state' : GPIO.LOW
+    },
+    23 : {
+        'name' : 'GPIO 23',
+        'state' : GPIO.LOW
+    },
+    24 : {
+        'name' : 'GPIO 24',
+        'state' : GPIO.LOW
+    },
+}
 
-# for pin in pins:
-#    GPIO.setup(pin, GPIO.OUT)
-#    GPIO.output(pin, GPIO.LOW)
+for pin in pins:
+    GPIO.setup(pin, GPIO.OUT)
+    GPIO.output(pin, GPIO.LOW)
 
 # ...
 # Function
@@ -151,6 +151,16 @@ def update_locker_status(code=None):
 # Routing
 # ...
 
+@app.route('/toggle-on/<gpio>', methods=['GET'])
+def toggle_on(gpio=None):
+    toggle_pin(int(gpio), 'on')
+    return "ON"
+    
+@app.route('/toggle-off/<gpio>', methods=['GET'])
+def toggle_off(gpio=None):
+    toggle_pin(int(gpio), 'off')
+    return "OFF"
+
 # Video Feed
 @app.route('/video_feed/<locker_code>', methods=['GET'])
 def video_feed(locker_code=None):
@@ -181,7 +191,7 @@ def video_feed(locker_code=None):
             
             h, w = frame.shape[:-1]
             center_x, center_y = w // 2, h // 2
-            zoom_factor = 2
+            zoom_factor = 1.5
             roi_width, roi_height = int(w / zoom_factor), int(h / zoom_factor)
             roi_x = center_x - roi_width // 2
             roi_y = center_y - roi_height // 2
@@ -204,7 +214,7 @@ def video_feed(locker_code=None):
             
             yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
             
-            if i == 1000:
+            if i == 29:
                 outputFrame = roi.copy()
                 break;
 
@@ -694,15 +704,21 @@ def auth_iris_confirm_validate(locker_code=None):
 
     if request.form.get('auth_action') == "re-capture":
         return redirect('/auth/iris/' + locker_code)
+        
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT * FROM lockers WHERE code = %s", [locker_code])
+    locker = cursor.fetchone()
     
     # TODO: Open Lock of Locker using GPIO
+    GPIO.output(locker[5], GPIO.HIGH)
 
     # TODO: Redirect to Waiting Page
+    # ~ url_for('waiting', action='keep', locker_code=locker_code)
     return redirect('/waiting/keep/' + locker_code)
 
 # Waiting: Keep Device & Pick up Device
-@app.route('/waiting/<action>/<locker_code>', methods=['GET'])
-def waiting(action=None, locker_code=None):
+@app.route('/waiting/<locker_action>/<locker_code>', methods=['GET'])
+def waiting(locker_action='keep', locker_code=None):
     cursor = mysql.connection.cursor()
     cursor.execute("SELECT * FROM lockers WHERE code = %s", [locker_code])
     locker = cursor.fetchone()
@@ -719,28 +735,52 @@ def waiting(action=None, locker_code=None):
     }
     
     message = ''
-    if action == 'keep':
+    if locker_action == 'keep':
         message = 'Locker ' + locker_code + ' is now unlocked, please keep your device as soon as possible'
     else:
         message = 'Locker ' + locker_code + ' is now unlocked, please pick up your device as soon as possible'
 
-    return render_template('waiting.html', message=message, locker_detail=locker_detail)
+    return render_template('waiting.html', message=message, locker_action=locker_action, locker_detail=locker_detail)
 
 @app.route('/waiting/<action>/<locker_code>/validate', methods=['POST'])
 def waiting_validate(action=None, locker_code=None):
     if not request.form.get('confirm_action'):
         return redirect('/waiting/' + action + '/' + locker_code)
 
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT * FROM lockers WHERE code = %s", [locker_code])
+    locker = cursor.fetchone()
+    cursor.close()
+
     if request.form.get('confirm_action') == "cancel":
+        cursor = mysql.connection.cursor()
+        cursor.execute("SELECT * FROM users WHERE id = %s", [locker[4]])
+        user = cursor.fetchone()
+        cursor.close()
+        
         # TODO: Set user to inactive
+        cursor = mysql.connection.cursor()
+        cursor.execute("UPDATE users SET status = %s WHERE id = %s", ('INACTIVE', user[0]))
+        mysql.connection.commit()
+        
         # TODO: Set locker status to available, used_by to empty
+        cursor = mysql.connection.cursor()
+        cursor.execute("UPDATE lockers SET status = %s WHERE code = %s", ('AVAILABLE', locker_code))
+        mysql.connection.commit()
+        cursor.close()
         
         return redirect('/auth/iris/' + locker_code)
-        
+    
+    cursor = mysql.connection.cursor()
+    cursor.execute("UPDATE lockers SET status = %s WHERE code = %s", ('INUSE', locker_code))
+    mysql.connection.commit()
+    cursor.close()
+    
     # TODO: Close Lock of Locker using GPIO
+    GPIO.output(locker[5], GPIO.LOW)
 
     # TODO: Redirect to Success Page
-    return redirect('/success/' + action)
+    return redirect('/success/' + action + "/" + locker_code)
 
 # Success: Keep Device & Pick up Device
 @app.route('/success/<action>/<locker_code>', methods=['GET'])

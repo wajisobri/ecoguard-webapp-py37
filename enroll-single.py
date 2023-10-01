@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--file", type=str,
                     help="Path to the file that you want to verify.")
 
-parser.add_argument("--temp_dir", type=str, default="./templates/temp/",
+parser.add_argument("--temp_dir", type=str, default="./temp/",
 					help="Path to the directory containing templates.")
 
 args = parser.parse_args()
