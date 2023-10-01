@@ -15,7 +15,7 @@ from datetime import datetime
 ##	(The following parameters are default for CASIA1 dataset)
 ##-----------------------------------------------------------------------------
 # Segmentation parameters
-eyelashes_thres = 10
+eyelashes_thres = 5
 
 # Normalisation parameters
 radial_res = 20
@@ -30,7 +30,7 @@ sigmaOnf = 0.5
 ##-----------------------------------------------------------------------------
 ##  Function
 ##-----------------------------------------------------------------------------
-def extractFeature(im_filename, eyelashes_thres=10, use_multiprocess=True):
+def extractFeature(im_filename, eyelashes_thres=5, use_multiprocess=True):
 	"""
 	Description:
 		Extract features from an iris image
@@ -87,7 +87,7 @@ def extractFeature(im_filename, eyelashes_thres=10, use_multiprocess=True):
 	# Save plot to image
 	timestamp = datetime.now()
 	filename = "plot_"+ timestamp.strftime("%Y%m%d%H%M%S") + ".jpg"
-	plt.savefig(os.path.join('static/uploads/', filename))
+	plt.savefig(os.path.join('./temp/', filename))
 	plt.close()
 
 	# Return
